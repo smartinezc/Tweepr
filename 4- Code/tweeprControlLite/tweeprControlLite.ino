@@ -26,6 +26,8 @@
  * ----------------------------------------------------
 */
 
+// TODO: Define pins
+
 // Pines a utilizar del Arduino
 #define DIR_L   3         // Pin for Left Motor Direction
 #define STEP_L  3         // Pin for Left Motor Step
@@ -36,12 +38,12 @@
 // Sensor Address
 #define MPU6050_ADDR    0x68      // MPU6050 I2C Address (Sometimes 0x69)
 
-// Máximos y Mínimos de la salida del control
-#define MAXLIM 40       // Delta de Ángulo máximo permitido para el robot
-#define MINLIM -40      // Delta de Ángulo mínimo permitido para el robot
+// Absolute Max limits
+#define MAX_ANGLE 40    // Max allowed angle deviation from the center
+#define MAX_PID   400   // Max PID value output allowed
 
-// Periodo de muestreo de la señal y ciclo de control, en ms
-#define periodo 20
+// Period for signal sampling and control sequence, in ms
+#define period 20
 
 // Ganancias sintonizadas del PID
 const float Kp = 7;       // Constante Proporcional del sistema
@@ -97,7 +99,7 @@ void setup()
   Serial.begin(115200);     // Inicia el puerto serial
   Wire.begin();             // Inicia la comunicación I2C
 
-  pinsInit();               // Initialize and define pins mode
+  initPins();               // Initialize and define pins mode
   byte stat = mpu.begin();  // Start I2C communication with MPU6050 sensor
 
   while(stat != 0) { }      // If sensor can't be initianlize exit code
@@ -116,7 +118,7 @@ void loop()
   // TODO: Make WiFi commands last for some loops
   
   // Check if the signals reading time period have passed
-  if(active && millis() - timeAcc >= periodo)
+  if(active && millis() - timeAcc >= period)
   {
     // Read angle calculation from MPU and calculate the error
     angleR = mpu.getAngleX();
@@ -126,23 +128,24 @@ void loop()
     prop = Kp * error;
 
     // Integral
-    inte = inte + ((Ki*periodo)/2)*(error + errorPrev);
+    inte = inte + ((Ki*period)/2)*(error + errorPrev);
 
     // Derivativo
-    deri = (Kd*(angleR - anglPrev)/periodo);
+    deri = (Kd*(angleR - anglPrev)/period);
 
     // Salida del PID
     PIDout = prop + inte + deri;
-    if(PIDout < MINLIM)       {PIDout = MINLIM;}
-    else if(PIDout > MAXLIM)  {PIDout = MAXLIM;}
+    if(PIDout < -MAX_PID)       {PIDout = -MAX_PID;}
+    else if(PIDout > MAX_PID)   {PIDout = MAX_PID;}
     
     // Actualizar la memoria del control
     anglPrev = angleR; 
     errorPrev = error;
 
     // TODO: Dead band where the robot is somewhat balanced (Don't control)
+    // TODO: Turn off control if angle > MAX_ANGLE (active = false)
 
-    // TODO: Change PIDout whit WiFI commands
+    // TODO: Change PIDout whit WiFI commands for each motor L&R
 
     Serial.println(error);
     
@@ -151,7 +154,7 @@ void loop()
     // Update current execution time
     timeAcc = millis();
   }
-  else if(millis() - timeAcc >= periodo)
+  else if(millis() - timeAcc >= period)
   {
     angleR = mpu.getAngleX();
 
@@ -171,7 +174,7 @@ void loop()
 */
 
 // Function to initialize and define pins mode
-void pinsInit()
+void initPins()
 {
   // Define outputs
   pinMode(DIR_L, OUTPUT);
