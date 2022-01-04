@@ -85,6 +85,12 @@ float PIDout = 0.0;
 float anglPrev = 0.0;       // Previous angle reading           [cm]
 float errorPrev = 0.0;      // Error previo de la planta        [cm]
 
+// Motor Control variables
+float PIDoutLeft = 0.0;     // PID value for Left Motor
+float PIDoutRight = 0.0;    // PID value for Right Motor
+int leftMotorPulseP;        // Left motor pulse period (*20us)  [us]
+int rightMotorPulseP;       // Right motor pulse period (*20us) [us]
+
 // Ángulo del servo
 int angServo = 90;        //                                  [°]
 
@@ -146,10 +152,30 @@ void loop()
     // TODO: Turn off control if angle > MAX_ANGLE (active = false)
 
     // TODO: Change PIDout whit WiFI commands for each motor L&R
+    PIDoutLeft = PIDout;
+    PIDoutRight = PIDout;
 
     Serial.println(error);
     
     // TODO: Motor control with PIDout values
+    // Refactor PIDout value for each motor, take integrer part as pulse period for control
+    if(PIDoutLeft > 0)
+    {
+      leftMotorPulseP = -5 - (1 / (PIDoutLeft + 9)) * 5500;
+    }
+    else if(PIDoutLeft < 0)
+    {
+      leftMotorPulseP = 5 + (1 / (PIDoutLeft - 9)) * 5500;
+    }
+
+    if(PIDoutRight > 0)
+    {
+      rightMotorPulseP = -5 - (1 / (PIDoutRight + 9)) * 5500;
+    }
+    else if(PIDoutRight < 0)
+    {
+      rightMotorPulseP = 5 + (1 / (PIDoutRight - 9)) * 5500;
+    }
 
     // Update current execution time
     timeAcc = millis();
