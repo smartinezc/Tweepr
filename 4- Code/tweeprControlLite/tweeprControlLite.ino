@@ -29,11 +29,11 @@
 */
 
 // ESP32 pins used
-#define EN_M    12         // Pin for Motors Enable
-#define STEP_L  13         // Pin for Left Motor Step
-#define DIR_L   14         // Pin for Left Motor Direction
-#define STEP_R  26         // Pin for Right Motor Step
-#define DIR_R   27         // Pin for Right Motor Direction
+#define EN_M    5         // Pin for Motors Enable
+#define STEP_L  16         // Pin for Left Motor Step
+#define DIR_L   17         // Pin for Left Motor Direction
+#define STEP_R  18         // Pin for Right Motor Step
+#define DIR_R   19         // Pin for Right Motor Direction
 
 
 // Sensor Address
