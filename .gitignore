@@ -1,3 +1,7 @@
 # Folder with useless content
 .Ignore/
 .vscode/
+
+
+# Ignore GCode files, as each printer may vary
+.gcode
