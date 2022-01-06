@@ -12,6 +12,7 @@
 
 // TODO: Write documentation
 // TODO: Port manipulation?
+// TODO: Use Interrupt for Motor Control Loop?
 
 /* ----------------------------------------------------
  * LIBRARIES
@@ -27,14 +28,13 @@
  * ----------------------------------------------------
 */
 
-// TODO: Define pins
+// ESP32 pins used
+#define EN_M    12         // Pin for Motors Enable
+#define STEP_L  13         // Pin for Left Motor Step
+#define DIR_L   14         // Pin for Left Motor Direction
+#define STEP_R  26         // Pin for Right Motor Step
+#define DIR_R   27         // Pin for Right Motor Direction
 
-// Pines a utilizar del Arduino
-#define DIR_L   3         // Pin for Left Motor Direction
-#define STEP_L  3         // Pin for Left Motor Step
-#define DIR_R   3         // Pin for Right Motor Direction
-#define STEP_R  3         // Pin for Right Motor Step
-#define EN_M    2         // Pin for Motors Enable
 
 // Sensor Address
 #define MPU6050_ADDR    0x68      // MPU6050 I2C Address (Sometimes 0x69)
@@ -97,9 +97,6 @@ int leftMotorPulseP_Prev;   // Left motor pulse period (*20us)  [us]
 int rightMotorPulseP_Prev;  // Right motor pulse period (*20us) [us]
 int countSpeedMotorL = 0;   // Counter for pulse duration, Left Motor
 int countSpeedMotorR = 0;   // Counter for pulse duration, Right Motor
-
-// Ángulo del servo
-int angServo = 90;        //                                  [°]
 
 
 /* ----------------------------------------------------
