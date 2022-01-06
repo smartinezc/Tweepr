@@ -6,8 +6,8 @@
  * Platform for Robotics (TWEEPR) system
  *                Santiago Martínez
  *           
- * Version V0.2
- * December 28, 2021
+ * Version V0.4
+ * January 6,2022
 */
 
 // TODO: Write documentation
@@ -161,7 +161,6 @@ void loop()
 
     //Serial.println(error);
     
-    // TODO: Motor control with PIDout values
     // Refactor PIDout value for each motor, take integrer part as pulse period for control
     if(PIDoutLeft > 0)
     {
