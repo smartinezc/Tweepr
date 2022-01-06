@@ -6,11 +6,13 @@
  * Platform for Robotics (TWEEPR) system
  *                Santiago Martínez
  *           
- * Version V0.2
- * December 28, 2021
+ * Version V0.4
+ * January 6,2022
 */
 
 // TODO: Write documentation
+// TODO: Port manipulation?
+// TODO: Use Interrupt for Motor Control Loop?
 
 /* ----------------------------------------------------
  * LIBRARIES
@@ -26,14 +28,13 @@
  * ----------------------------------------------------
 */
 
-// TODO: Define pins
+// ESP32 pins used
+#define EN_M    5         // Pin for Motors Enable
+#define STEP_L  16         // Pin for Left Motor Step
+#define DIR_L   17         // Pin for Left Motor Direction
+#define STEP_R  18         // Pin for Right Motor Step
+#define DIR_R   19         // Pin for Right Motor Direction
 
-// Pines a utilizar del Arduino
-#define DIR_L   3         // Pin for Left Motor Direction
-#define STEP_L  3         // Pin for Left Motor Step
-#define DIR_R   3         // Pin for Right Motor Direction
-#define STEP_R  3         // Pin for Right Motor Step
-#define EN_M    2         // Pin for Motors Enable
 
 // Sensor Address
 #define MPU6050_ADDR    0x68      // MPU6050 I2C Address (Sometimes 0x69)
@@ -42,8 +43,9 @@
 #define MAX_ANGLE 40    // Max allowed angle deviation from the center
 #define MAX_PID   400   // Max PID value output allowed
 
-// Period for signal sampling and control sequence, in ms
-#define period 20
+// Loop period constants
+#define period    20    // Period for signal sampling         [ms]
+#define periodMC  20    // Period for Motor Control           [us]
 
 // Ganancias sintonizadas del PID
 const float Kp = 7;       // Constante Proporcional del sistema
@@ -65,7 +67,7 @@ MPU6050 mpu(Wire);
 */
 
 // Tiempo de ejecución del programa
-unsigned long timeAcc = 0;  //                                [ms]
+unsigned long timeAcc = 0;  //                                  [ms]
 
 bool active = false;        // If true, motors control would be active
 
@@ -85,8 +87,16 @@ float PIDout = 0.0;
 float anglPrev = 0.0;       // Previous angle reading           [cm]
 float errorPrev = 0.0;      // Error previo de la planta        [cm]
 
-// Ángulo del servo
-int angServo = 90;        //                                  [°]
+// Motor Control variables
+unsigned long timeMC = 0;   // Execution time for Motor Control [us]
+float PIDoutLeft = 0.0;     // PID value for Left Motor
+float PIDoutRight = 0.0;    // PID value for Right Motor
+int leftMotorPulseP;        // Left motor pulse period (*20us)  [us]
+int rightMotorPulseP;       // Right motor pulse period (*20us) [us]
+int leftMotorPulseP_Prev;   // Left motor pulse period (*20us)  [us]
+int rightMotorPulseP_Prev;  // Right motor pulse period (*20us) [us]
+int countSpeedMotorL = 0;   // Counter for pulse duration, Left Motor
+int countSpeedMotorR = 0;   // Counter for pulse duration, Right Motor
 
 
 /* ----------------------------------------------------
@@ -146,10 +156,31 @@ void loop()
     // TODO: Turn off control if angle > MAX_ANGLE (active = false)
 
     // TODO: Change PIDout whit WiFI commands for each motor L&R
+    PIDoutLeft = PIDout;
+    PIDoutRight = PIDout;
 
-    Serial.println(error);
+    //Serial.println(error);
     
-    // TODO: Motor control with PIDout values
+    // Refactor PIDout value for each motor, take integrer part as pulse period for control
+    if(PIDoutLeft > 0)
+    {
+      leftMotorPulseP = -5 + (1 / (PIDoutLeft + 9)) * 5500;
+    }
+    else if(PIDoutLeft < 0)
+    {
+      leftMotorPulseP = 5 + (1 / (PIDoutLeft - 9)) * 5500;
+    }
+
+    if(PIDoutRight > 0)
+    {
+      rightMotorPulseP = -5 + (1 / (PIDoutRight + 9)) * 5500;
+    }
+    else if(PIDoutRight < 0)
+    {
+      rightMotorPulseP = 5 + (1 / (PIDoutRight - 9)) * 5500;
+    }
+
+    Serial.println(leftMotorPulseP);
 
     // Update current execution time
     timeAcc = millis();
@@ -164,6 +195,64 @@ void loop()
     // Update current execution time
     timeAcc = millis();
   }
+
+
+  // Motor Control Loop (ticks every 20us)
+  if(active && micros() - timeMC >= periodMC)
+  {
+    // Left Motor pulse control
+    countSpeedMotorL++;             // Increase counter every time this routine is executed
+
+    // Check if the counter is greater than the previous motor pulse period
+    if(countSpeedMotorL > leftMotorPulseP_Prev)
+    {
+      countSpeedMotorL = 0;                       // Reset counter if greater
+      leftMotorPulseP_Prev = leftMotorPulseP;     // Load next motor pulse period
+
+      // Check if the new motor pulse period is negative
+      if(leftMotorPulseP_Prev < 0)
+      {
+        digitalWrite(DIR_L, LOW);                 // Set DIR_L pin to LOW, reverse direction
+        leftMotorPulseP_Prev *= -1;               // Invert to count positive period intervals
+      }
+      else
+      {
+        digitalWrite(DIR_L, HIGH);                // Set DIR_L pin to HIGH, forward direction
+      }
+    }
+    else if (countSpeedMotorL == 1)digitalWrite(DIR_L, HIGH);   // Create pulse for motor step
+    else if (countSpeedMotorL == 2)digitalWrite(DIR_L, LOW);    // End motor step pulse in 20us
+
+
+
+    // Right Motor pulse control
+    countSpeedMotorR++;             // Increase counter every time this routine is executed
+
+    // Check if the counter is greater than the previous motor pulse period
+    if(countSpeedMotorR > rightMotorPulseP_Prev)
+    {
+      countSpeedMotorR = 0;                       // Reset counter if greater
+      rightMotorPulseP_Prev = rightMotorPulseP;   // Load next motor pulse period
+
+      // Check if the new motor pulse period is negative
+      if(rightMotorPulseP_Prev < 0)
+      {
+        digitalWrite(DIR_R, LOW);                 // Set DIR_R pin to LOW, reverse direction
+        rightMotorPulseP_Prev *= -1;              // Invert to count positive period intervals
+      }
+      else
+      {
+        digitalWrite(DIR_R, HIGH);                // Set DIR_R pin to HIGH, forward direction
+      }
+    }
+    else if (countSpeedMotorR == 1)digitalWrite(DIR_R, HIGH);   // Create pulse for motor step
+    else if (countSpeedMotorR == 2)digitalWrite(DIR_R, LOW);    // End motor step pulse in 20us
+
+    
+    // Update current execution time for Motor Control
+    timeMC = micros();
+  }
+  
   
 }
 
