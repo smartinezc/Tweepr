@@ -4,4 +4,4 @@
 
 
 # Ignore GCode files, as each printer may vary
-.gcode
+*.gcode
