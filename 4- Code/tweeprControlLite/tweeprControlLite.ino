@@ -12,7 +12,6 @@
 
 // TODO: Write documentation
 // TODO: Port manipulation?
-// TODO: Use Interrupt for Motor Control Loop?
 
 /* ----------------------------------------------------
  * LIBRARIES
@@ -50,7 +49,7 @@
 // Ganancias sintonizadas del PID
 const float Kp = 7;       // Constante Proporcional del sistema
 const float Ki = 0;       // Constante Integral del sistema
-const float Kd = 2500;    // Constante Derivativa del sistema
+const float Kd = 0;       // Constante Derivativa del sistema
 
 
 /* ----------------------------------------------------
@@ -60,6 +59,9 @@ const float Kd = 2500;    // Constante Derivativa del sistema
 
 // Objeto que representa el sensor MPU6050
 MPU6050 mpu(Wire);
+
+// Hardware timer for Motor Control Loop
+hw_timer_t * motorControlTimer = NULL;
 
 /* ----------------------------------------------------
  * VARIABLES
@@ -91,13 +93,69 @@ float errorPrev = 0.0;      // Error previo de la planta        [cm]
 unsigned long timeMC = 0;   // Execution time for Motor Control [us]
 float PIDoutLeft = 0.0;     // PID value for Left Motor
 float PIDoutRight = 0.0;    // PID value for Right Motor
-int leftMotorPulseP;        // Left motor pulse period (*20us)  [us]
-int rightMotorPulseP;       // Right motor pulse period (*20us) [us]
-int leftMotorPulseP_Prev;   // Left motor pulse period (*20us)  [us]
-int rightMotorPulseP_Prev;  // Right motor pulse period (*20us) [us]
-int countSpeedMotorL = 0;   // Counter for pulse duration, Left Motor
-int countSpeedMotorR = 0;   // Counter for pulse duration, Right Motor
+volatile int leftMotorPulseP;        // Left motor pulse period (*20us)  [us]
+volatile int rightMotorPulseP;       // Right motor pulse period (*20us) [us]
+volatile int leftMotorPulseP_Prev;   // Left motor pulse period (*20us)  [us]
+volatile int rightMotorPulseP_Prev;  // Right motor pulse period (*20us) [us]
+volatile int countSpeedMotorL = 0;   // Counter for pulse duration, Left Motor
+volatile int countSpeedMotorR = 0;   // Counter for pulse duration, Right Motor
 
+/* ----------------------------------------------------
+ * INTERRUPT ROUTINE
+ * ----------------------------------------------------
+*/
+
+// Motor Control Loop (ticks every 20us)
+void IRAM_ATTR motorControl()
+{
+  // Left Motor pulse control
+  countSpeedMotorL++;             // Increase counter every time this routine is executed
+  
+  // Check if the counter is greater than the previous motor pulse period
+  if(countSpeedMotorL > leftMotorPulseP_Prev)
+  {
+    countSpeedMotorL = 0;                       // Reset counter if greater
+    leftMotorPulseP_Prev = leftMotorPulseP;     // Load next motor pulse period
+  
+    // Check if the new motor pulse period is negative
+    if(leftMotorPulseP_Prev < 0)
+    {
+      digitalWrite(DIR_L, LOW);                 // Set DIR_L pin to LOW, reverse direction
+      leftMotorPulseP_Prev *= -1;               // Invert to count positive period intervals
+    }
+    else
+    {
+      digitalWrite(DIR_L, HIGH);                // Set DIR_L pin to HIGH, forward direction
+    }
+  }
+  else if (countSpeedMotorL == 1)digitalWrite(STEP_L, HIGH);   // Create pulse for motor step
+  else if (countSpeedMotorL == 2)digitalWrite(STEP_L, LOW);    // End motor step pulse in 20us
+  
+  
+  
+  // Right Motor pulse control
+  countSpeedMotorR++;             // Increase counter every time this routine is executed
+  
+  // Check if the counter is greater than the previous motor pulse period
+  if(countSpeedMotorR > rightMotorPulseP_Prev)
+  {
+    countSpeedMotorR = 0;                       // Reset counter if greater
+    rightMotorPulseP_Prev = rightMotorPulseP;   // Load next motor pulse period
+  
+    // Check if the new motor pulse period is negative
+    if(rightMotorPulseP_Prev < 0)
+    {
+      digitalWrite(DIR_R, LOW);                 // Set DIR_R pin to LOW, reverse direction
+      rightMotorPulseP_Prev *= -1;              // Invert to count positive period intervals
+    }
+    else
+    {
+      digitalWrite(DIR_R, HIGH);                // Set DIR_R pin to HIGH, forward direction
+    }
+  }
+  else if (countSpeedMotorR == 1)digitalWrite(STEP_R, HIGH);   // Create pulse for motor step
+  else if (countSpeedMotorR == 2)digitalWrite(STEP_R, LOW);    // End motor step pulse in 20us
+}
 
 /* ----------------------------------------------------
  * MAIN
@@ -117,6 +175,12 @@ void setup()
   // Establish the gyro offset on startup
   delay(1000);
   mpu.calcOffsets();
+
+  // Start timer for Motor Control Loop. Using timer 0, Clock period 12.5ns
+  motorControlTimer = timerBegin(0, 20, true);      // -> 12.5ns * 20 = 250ns
+  timerAttachInterrupt(motorControlTimer, &motorControl, true);
+  timerAlarmWrite(motorControlTimer, 500, true);    // 500 * 250ns = 125us, autoreload true
+  timerAlarmEnable(motorControlTimer);              // Enable
 }
 
 void loop() 
@@ -180,8 +244,6 @@ void loop()
       rightMotorPulseP = 5 + (1 / (PIDoutRight - 9)) * 5500;
     }
 
-    Serial.println(leftMotorPulseP);
-
     // Update current execution time
     timeAcc = millis();
   }
@@ -190,70 +252,15 @@ void loop()
     angleR = mpu.getAngleX();
 
     // Activate the control loop if Tweepr is up
-    if(!active && angleR > 89 && angleR < 91){active = true;}
-
+    if(!active && angleR > 89 && angleR < 91)
+    {
+      active = true;
+      digitalWrite(EN_M, LOW);
+    }
+    
     // Update current execution time
     timeAcc = millis();
   }
-
-
-  // Motor Control Loop (ticks every 20us)
-  if(active && micros() - timeMC >= periodMC)
-  {
-    // Left Motor pulse control
-    countSpeedMotorL++;             // Increase counter every time this routine is executed
-
-    // Check if the counter is greater than the previous motor pulse period
-    if(countSpeedMotorL > leftMotorPulseP_Prev)
-    {
-      countSpeedMotorL = 0;                       // Reset counter if greater
-      leftMotorPulseP_Prev = leftMotorPulseP;     // Load next motor pulse period
-
-      // Check if the new motor pulse period is negative
-      if(leftMotorPulseP_Prev < 0)
-      {
-        digitalWrite(DIR_L, LOW);                 // Set DIR_L pin to LOW, reverse direction
-        leftMotorPulseP_Prev *= -1;               // Invert to count positive period intervals
-      }
-      else
-      {
-        digitalWrite(DIR_L, HIGH);                // Set DIR_L pin to HIGH, forward direction
-      }
-    }
-    else if (countSpeedMotorL == 1)digitalWrite(DIR_L, HIGH);   // Create pulse for motor step
-    else if (countSpeedMotorL == 2)digitalWrite(DIR_L, LOW);    // End motor step pulse in 20us
-
-
-
-    // Right Motor pulse control
-    countSpeedMotorR++;             // Increase counter every time this routine is executed
-
-    // Check if the counter is greater than the previous motor pulse period
-    if(countSpeedMotorR > rightMotorPulseP_Prev)
-    {
-      countSpeedMotorR = 0;                       // Reset counter if greater
-      rightMotorPulseP_Prev = rightMotorPulseP;   // Load next motor pulse period
-
-      // Check if the new motor pulse period is negative
-      if(rightMotorPulseP_Prev < 0)
-      {
-        digitalWrite(DIR_R, LOW);                 // Set DIR_R pin to LOW, reverse direction
-        rightMotorPulseP_Prev *= -1;              // Invert to count positive period intervals
-      }
-      else
-      {
-        digitalWrite(DIR_R, HIGH);                // Set DIR_R pin to HIGH, forward direction
-      }
-    }
-    else if (countSpeedMotorR == 1)digitalWrite(DIR_R, HIGH);   // Create pulse for motor step
-    else if (countSpeedMotorR == 2)digitalWrite(DIR_R, LOW);    // End motor step pulse in 20us
-
-    
-    // Update current execution time for Motor Control
-    timeMC = micros();
-  }
-  
-  
 }
 
 
