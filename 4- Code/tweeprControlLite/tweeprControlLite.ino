@@ -11,7 +11,6 @@
 */
 
 // TODO: Write documentation
-// TODO: Port manipulation?
 
 /* ----------------------------------------------------
  * LIBRARIES
@@ -40,17 +39,16 @@
 
 // Absolute limits
 #define MIN_ANGLE 5     // Min angle to enable control over motors
-#define MAX_ANGLE 30    // Max allowed angle deviation from the center
+#define MAX_ANGLE 35    // Max allowed angle deviation from the center
 #define MAX_PID   400   // Max PID value output allowed
 
 // Loop period constants
 #define period    20    // Period for signal sampling         [ms]
-#define periodMC  20    // Period for Motor Control           [us]
 
 // Tunned PID gains
 const float Kp = 15;    // Proporcional gain (~15)
-const float Ki = 0;    // Integral gain ()
-const float Kd = 10;    // Derivative gain ()
+const float Ki = 0;     // Integral gain ()
+const float Kd = 15;    // Derivative gain ()
 
 /* ----------------------------------------------------
  * OBJETOS
@@ -105,7 +103,7 @@ volatile int countSpeedMotorR = 0;   // Counter for pulse duration, Right Motor
  * ----------------------------------------------------
 */
 
-// Motor Control Loop (ticks every 20us)
+// Motor Control Loop (ticks every 50us)
 void IRAM_ATTR motorControl()
 {
   // Left Motor pulse control
