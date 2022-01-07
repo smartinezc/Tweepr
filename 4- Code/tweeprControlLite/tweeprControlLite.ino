@@ -220,7 +220,7 @@ void loop()
     // TODO: Turn off control if angle > MAX_ANGLE (active = false)
 
     // TODO: Change PIDout whit WiFI commands for each motor L&R
-    PIDoutLeft = PIDout;
+    PIDoutLeft = -PIDout;
     PIDoutRight = PIDout;
 
     //Serial.println(error);
