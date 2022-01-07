@@ -220,7 +220,13 @@ void loop()
     // Dead band where the robot is somewhat balanced (Don't control)
     if(error < MIN_ANGLE && error > -MIN_ANGLE)PIDout = 0;
     
-    // TODO: Turn off control if angle > MAX_ANGLE (active = false)
+    // Turn off control if angle > MAX_ANGLE (Disable Motors)
+    if(error > MAX_ANGLE || error < -MAX_ANGLE)
+    {
+      active = false;
+      PIDout = 0;
+      digitalWrite(EN_M, HIGH);
+    }
 
     // TODO: Change PIDout whit WiFI commands for each motor L&R
     PIDoutLeft = -PIDout;
