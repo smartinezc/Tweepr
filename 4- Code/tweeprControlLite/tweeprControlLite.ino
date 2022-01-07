@@ -38,7 +38,8 @@
 // Sensor Address
 #define MPU6050_ADDR    0x68      // MPU6050 I2C Address (Sometimes 0x69)
 
-// Absolute Max limits
+// Absolute limits
+#define MIN_ANGLE 5     // Min angle to enable control over motors
 #define MAX_ANGLE 40    // Max allowed angle deviation from the center
 #define MAX_PID   400   // Max PID value output allowed
 
@@ -47,7 +48,7 @@
 #define periodMC  20    // Period for Motor Control           [us]
 
 // Ganancias sintonizadas del PID
-const float Kp = 7;       // Constante Proporcional del sistema
+const float Kp = 4;       // Constante Proporcional del sistema
 const float Ki = 0;       // Constante Integral del sistema
 const float Kd = 0;       // Constante Derivativa del sistema
 
@@ -216,14 +217,14 @@ void loop()
     anglPrev = angleR; 
     errorPrev = error;
 
-    // TODO: Dead band where the robot is somewhat balanced (Don't control)
+    // Dead band where the robot is somewhat balanced (Don't control)
+    if(error < MIN_ANGLE && error > -MIN_ANGLE)PIDout = 0;
+    
     // TODO: Turn off control if angle > MAX_ANGLE (active = false)
 
     // TODO: Change PIDout whit WiFI commands for each motor L&R
     PIDoutLeft = -PIDout;
     PIDoutRight = PIDout;
-
-    //Serial.println(error);
     
     // Refactor PIDout value for each motor, take integrer part as pulse period for control
     if(PIDoutLeft > 0)
