@@ -40,18 +40,17 @@
 
 // Absolute limits
 #define MIN_ANGLE 5     // Min angle to enable control over motors
-#define MAX_ANGLE 40    // Max allowed angle deviation from the center
+#define MAX_ANGLE 30    // Max allowed angle deviation from the center
 #define MAX_PID   400   // Max PID value output allowed
 
 // Loop period constants
 #define period    20    // Period for signal sampling         [ms]
 #define periodMC  20    // Period for Motor Control           [us]
 
-// Ganancias sintonizadas del PID
-const float Kp = 4;       // Constante Proporcional del sistema
-const float Ki = 0;       // Constante Integral del sistema
-const float Kd = 0;       // Constante Derivativa del sistema
-
+// Tunned PID gains
+const float Kp = 15;    // Proporcional gain (~15)
+const float Ki = 0;    // Integral gain ()
+const float Kd = 10;    // Derivative gain ()
 
 /* ----------------------------------------------------
  * OBJETOS
@@ -180,7 +179,7 @@ void setup()
   // Start timer for Motor Control Loop. Using timer 0, Clock period 12.5ns
   motorControlTimer = timerBegin(0, 20, true);      // -> 12.5ns * 20 = 250ns
   timerAttachInterrupt(motorControlTimer, &motorControl, true);
-  timerAlarmWrite(motorControlTimer, 500, true);    // 500 * 250ns = 125us, autoreload true
+  timerAlarmWrite(motorControlTimer, 200, true);    // 200 * 250ns = 50us, autoreload true
   timerAlarmEnable(motorControlTimer);              // Enable
 }
 
