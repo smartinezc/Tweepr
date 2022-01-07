@@ -20,6 +20,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <MPU6050_light.h>
+#include <WiFi.h>               // WiFi library manager
+#include <ESPmDNS.h>            // mDNS library manager
+#include <ESPAsyncWebServer.h>  // Web Server library manager
 
 /* ----------------------------------------------------
  * CONSTANTS
@@ -32,7 +35,6 @@
 #define DIR_L   17         // Pin for Left Motor Direction
 #define STEP_R  18         // Pin for Right Motor Step
 #define DIR_R   19         // Pin for Right Motor Direction
-
 
 // Sensor Address
 #define MPU6050_ADDR    0x68      // MPU6050 I2C Address (Sometimes 0x69)
@@ -50,6 +52,10 @@ const float Kp = 15;    // Proporcional gain (~15)
 const float Ki = 0;     // Integral gain ()
 const float Kd = 15;    // Derivative gain ()
 
+// WiFi config
+#define netSSID "Martinez"          // SSID of WiFi network to be connected to
+#define netPASS "eli433Bijou19"     // Password of WiFi network
+
 /* ----------------------------------------------------
  * OBJETOS
  * ----------------------------------------------------
@@ -60,6 +66,9 @@ MPU6050 mpu(Wire);
 
 // Hardware timer for Motor Control Loop
 hw_timer_t * motorControlTimer = NULL;
+
+// Web Server handler
+AsyncWebServer server(80);      // Server listening on 80 PORT
 
 /* ----------------------------------------------------
  * VARIABLES
@@ -174,6 +183,20 @@ void setup()
   delay(1000);
   mpu.calcOffsets();
 
+  // WiFi conection process
+  WiFi.begin(netSSID, netPASS);
+  while(WiFi.status() != WL_CONNECTED)delay(800);   // Wait for connection to be establish
+  if(!MDNS.begin("TweeprControl"))return;           // Start mDNS service
+
+  // Server functions
+  server.on("/hello", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", "Hello World");
+  });
+  server.on("/bye", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", "Ok it works");
+  });
+  server.begin();
+
   // Start timer for Motor Control Loop. Using timer 0, Clock period 12.5ns
   motorControlTimer = timerBegin(0, 20, true);      // -> 12.5ns * 20 = 250ns
   timerAttachInterrupt(motorControlTimer, &motorControl, true);
@@ -247,6 +270,8 @@ void loop()
     {
       rightMotorPulseP = 5 + (1 / (PIDoutRight - 9)) * 5500;
     }
+
+    Serial.println(leftMotorPulseP);
 
     // Update current execution time
     timeAcc = millis();
