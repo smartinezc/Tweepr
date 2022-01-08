@@ -1,0 +1,94 @@
+html 
+{
+    font-family: Nunito;
+    display: inline-block;
+    background-color: #FFFFFF;
+}
+
+h1
+{
+    color: #FFFFFF;
+    font-size: 2.5rem;
+}
+
+input[type="number"] 
+{
+    resize: none;
+    width: 40px;
+}
+
+.banner
+{
+    text-align: center;
+    padding: 10px;
+
+    background-color: #0F3376;
+    border-radius: 10px;
+    box-shadow: 0.2rem 0.1rem 1.5rem #AAAAAA;
+}
+
+.card
+{
+    width: 20%;
+    min-width: 350px;
+    padding: 20px;
+    margin: 20px;
+
+    background-color: #FFFFFF;
+    border: 1px whitesmoke solid;
+    border-radius: 10px;
+    box-shadow: 0.2rem 0.1rem 1.5rem #AAAAAA;
+
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.graph
+{
+    display: flex;
+}
+
+.moveArrow
+{
+    width: 5rem;
+}
+
+p
+{
+    font-size: 1.2rem;
+}
+
+.button
+{
+    display: inline-block;
+    background-color: #008CBA;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    padding: 16px 40px;
+    text-decoration: none;
+    font-size: 30px;
+    margin: 2px;
+    cursor: pointer;
+}
+
+.activeW
+{
+    position: fixed;
+    inset: auto 3rem 3rem auto;
+    padding: 1em;
+    font-size: 1.5rem;
+
+    background-color: #f44336;
+    color: white;
+    border-radius: 10px;
+    box-shadow: 0.2rem 0.1rem 1.5rem #AAAAAA;
+
+    text-decoration: none;
+}
+
+.activeW:hover
+{
+    text-decoration: underline;
+}
