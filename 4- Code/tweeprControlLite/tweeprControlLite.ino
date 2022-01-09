@@ -17,12 +17,13 @@
  * ----------------------------------------------------
 */
 
-#include <Arduino.h>
-#include <Wire.h>
-#include <MPU6050_light.h>
+#include <Arduino.h>            // Basic interface
+#include <Wire.h>               // I2C communication manager
+#include <MPU6050_light.h>      // MPU sensor manager
 #include <WiFi.h>               // WiFi library manager
 #include <ESPmDNS.h>            // mDNS library manager
 #include <ESPAsyncWebServer.h>  // Web Server library manager
+#include <SPIFFS.h>             // File server manager
 
 /* ----------------------------------------------------
  * CONSTANTS
@@ -40,17 +41,12 @@
 #define MPU6050_ADDR    0x68      // MPU6050 I2C Address (Sometimes 0x69)
 
 // Absolute limits
-#define MIN_ANGLE 5     // Min angle to enable control over motors
-#define MAX_ANGLE 35    // Max allowed angle deviation from the center
+#define MIN_ANGLE 2     // Min angle to enable control over motors
+#define MAX_ANGLE 40    // Max allowed angle deviation from the center
 #define MAX_PID   400   // Max PID value output allowed
 
 // Loop period constants
 #define period    20    // Period for signal sampling         [ms]
-
-// Tunned PID gains
-const float Kp = 15;    // Proporcional gain (~15)
-const float Ki = 0;     // Integral gain ()
-const float Kd = 15;    // Derivative gain ()
 
 // WiFi config
 #define netSSID "Martinez"          // SSID of WiFi network to be connected to
@@ -87,6 +83,11 @@ int accOffset = 1045;       // Accelerometer offset             [m/s^2]
 float setPoint = 90.0;      // SetPoint deseado del sistema     [cm]
 float angleR = 0.0;         // Angle reading from MPU sensor    [cm]
 float error = 0.0;          // Error en de la planta            [cm]
+
+// Tunned PID gains
+float Kp = 15;              // Proporcional gain (~15)
+float Ki = 0;               // Integral gain ()
+float Kd = 15;              // Derivative gain ()
 
 // Memoria de Control
 float prop = 0.0;
@@ -187,13 +188,29 @@ void setup()
   WiFi.begin(netSSID, netPASS);
   while(WiFi.status() != WL_CONNECTED)delay(800);   // Wait for connection to be establish
   if(!MDNS.begin("TweeprControl"))return;           // Start mDNS service
+  if(!SPIFFS.begin(true))return;                    // Initialize SPIFFS
 
-  // Server functions
-  server.on("/hello", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(200, "text/plain", "Hello World");
+  // Server routing
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/index.html");
   });
-  server.on("/bye", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(200, "text/plain", "Ok it works");
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/style.css", "text/css");
+  });
+  server.on("/app.js", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/app.js", "text/css");
+  });
+  
+  // Receive a GET request to tweeprcontrol.local/get?pidgains=<values>
+  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    String pidGains;    // Text message containing PID Gains values
+    if (request->hasParam("pidgains")) {
+        pidGains = request->getParam("pidgains")->value();
+        Kp = split(pidGains, ';', 0).toFloat();
+        Ki = split(pidGains, ';', 1).toFloat();
+        Kd = split(pidGains, ';', 2).toFloat();
+    }
+    request->send(200);
   });
   server.begin();
 
@@ -223,7 +240,7 @@ void loop()
     prop = Kp * error;
 
     // Integral
-    inte = inte + ((Ki*period)/2)*(error + errorPrev);
+    inte = inte + ((Ki*(period/1000))/2)*(error + errorPrev);
 
     // Derivativo
     deri = (Kd*(angleR - anglPrev)/period);
@@ -245,6 +262,7 @@ void loop()
     {
       active = false;
       PIDout = 0;
+      inte = 0;
       digitalWrite(EN_M, HIGH);
     }
 
@@ -261,6 +279,7 @@ void loop()
     {
       leftMotorPulseP = 5 + (1 / (PIDoutLeft - 9)) * 5500;
     }
+    else{leftMotorPulseP = 0;}
 
     if(PIDoutRight > 0)
     {
@@ -270,8 +289,9 @@ void loop()
     {
       rightMotorPulseP = 5 + (1 / (PIDoutRight - 9)) * 5500;
     }
+    else{rightMotorPulseP = 0;}
 
-    Serial.println(leftMotorPulseP);
+    //Serial.println(leftMotorPulseP);
 
     // Update current execution time
     timeAcc = millis();
@@ -310,4 +330,22 @@ void initPins()
 
   // Disable Stepper Motors while startup (LOW active)
   digitalWrite(EN_M, HIGH);
+}
+
+// Split String function into individual values ("" if not found)
+String split(String data, char separator, int index)
+{
+  int found = 0;
+  int strIndex[] = {0, -1};
+  int maxIndex = data.length()-1;
+
+  for(int i=0; i<=maxIndex && found<=index; i++){
+    if(data.charAt(i)==separator || i==maxIndex){
+        found++;
+        strIndex[0] = strIndex[1]+1;
+        strIndex[1] = (i == maxIndex) ? i+1 : i;
+    }
+  }
+
+  return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }

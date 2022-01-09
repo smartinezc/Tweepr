@@ -25,6 +25,9 @@ ranges.addEventListener('change', (e) => {
         iRange.value = iVal.value;
         dRange.value = dVal.value;
     }
+
+    // Send GET request to Tweepr ESP32
+    setPIDGains();
 });
 
 
@@ -53,4 +56,12 @@ function moveTweepr(e)
     {
         console.log("DDIDIDID");
     }
+}
+
+
+
+// Fetch methods to get and post data to Tweepr
+async function setPIDGains()
+{
+    const data = await fetch(`http://tweeprcontrol.local/get?pidgains=${pVal.value};${iVal.value};${dVal.value}`);
 }
