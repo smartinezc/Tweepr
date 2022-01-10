@@ -46,7 +46,7 @@
 #define MAX_PID   400   // Max PID value output allowed
 
 // Loop period constants
-#define period    20    // Period for signal sampling         [ms]
+#define period    4     // Period for signal sampling         [us]
 
 // WiFi config
 #define netSSID "Martinez"          // SSID of WiFi network to be connected to
@@ -77,25 +77,25 @@ unsigned long timeAcc = 0;  //                                  [ms]
 bool active = false;        // If true, motors control would be active
 
 // Variables de estado y mediciones
-long offsetsXY[2];          // Gyro Offsets for X and Y Axis    [deg]
-long gyroXY[2];             // Gyro readings for X and Y Axis   [deg]
-int accOffset = 1045;       // Accelerometer offset             [m/s^2]
-float setPoint = 90.0;      // SetPoint deseado del sistema     [cm]
-float angleR = 0.0;         // Angle reading from MPU sensor    [cm]
-float error = 0.0;          // Error en de la planta            [cm]
+float setPoint = 91.25;     // SetPoint deseado del sistema     [°]
+float moveSetP = 0.0;       // Moving comand Setpoint           [°]
+float angleR = 0.0;         // Angle reading from MPU sensor    [°]
+float error = 0.0;          // Error en de la planta            [°]
 
 // Tunned PID gains
-float Kp = 15;              // Proporcional gain (~15)
-float Ki = 0;               // Integral gain ()
-float Kd = 15;              // Derivative gain ()
+float Kp = 16;              // Proporcional gain (~12)
+float Ki = 4.0;             // Integral gain (~0.6)
+float Kd = 12;              // Derivative gain (~23)
 
-// Memoria de Control
+// Control Memory
 float prop = 0.0;
 float inte = 0.0;
 float deri = 0.0;
 float PIDout = 0.0;
-float anglPrev = 0.0;       // Previous angle reading           [cm]
-float errorPrev = 0.0;      // Error previo de la planta        [cm]
+float anglPrev = 0.0;       // Previous angle reading           [°]
+float anglPrev2 = 0.0;      // Previous 2 angle reading         [°]
+float anglPrev3 = 0.0;      // Previous 3 angle reading         [°]
+float errorPrev = 0.0;      // Error previo de la planta        [°]
 
 // Motor Control variables
 unsigned long timeMC = 0;   // Execution time for Motor Control [us]
@@ -173,16 +173,15 @@ void IRAM_ATTR motorControl()
 void setup() 
 {
   Serial.begin(115200);     // Inicia el puerto serial
-  Wire.begin();             // Inicia la comunicación I2C
+  Wire.begin();             // Start I2C communication
+  Wire.setClock(400000);    // Change I2C clock frecuency 400kHz
 
   initPins();               // Initialize and define pins mode
   byte stat = mpu.begin();  // Start I2C communication with MPU6050 sensor
-
   while(stat != 0) { }      // If sensor can't be initianlize exit code
-
-  // Establish the gyro offset on startup
+  mpu6050Init();            // Adjust resolution and filters for MPU6050
   delay(1000);
-  mpu.calcOffsets();
+  mpu.calcOffsets();        // Establish the gyro offset on startup
 
   // WiFi conection process
   WiFi.begin(netSSID, netPASS);
@@ -202,22 +201,32 @@ void setup()
   });
   
   // Receive a GET request to tweeprcontrol.local/get?pidgains=<values>
+  // Receive a GET request to tweeprcontrol.local/get?move=<values>
   server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    String pidGains;    // Text message containing PID Gains values
-    if (request->hasParam("pidgains")) {
-        pidGains = request->getParam("pidgains")->value();
-        Kp = split(pidGains, ';', 0).toFloat();
-        Ki = split(pidGains, ';', 1).toFloat();
-        Kd = split(pidGains, ';', 2).toFloat();
+    String cmdR;    // Text message containing the command recieved
+    if(request->hasParam("pidgains")) 
+    {
+      // Extract PID Gains values
+      cmdR = request->getParam("pidgains")->value();
+      Kp = split(cmdR, ';', 0).toFloat();
+      Ki = split(cmdR, ';', 1).toFloat();
+      Kd = split(cmdR, ';', 2).toFloat();
+      request->send(200);
     }
-    request->send(200);
+    else if(request->hasParam("move"))
+    {
+      // Change setPoint value
+      cmdR = request->getParam("move")->value();
+      setPoint += cmdR.toFloat();
+      request->send(200, "text/plain", String(setPoint, 2));
+    }
   });
   server.begin();
 
   // Start timer for Motor Control Loop. Using timer 0, Clock period 12.5ns
   motorControlTimer = timerBegin(0, 20, true);      // -> 12.5ns * 20 = 250ns
   timerAttachInterrupt(motorControlTimer, &motorControl, true);
-  timerAlarmWrite(motorControlTimer, 200, true);    // 200 * 250ns = 50us, autoreload true
+  timerAlarmWrite(motorControlTimer, 80, true);     // 80 * 250ns = 20us, autoreload true
   timerAlarmEnable(motorControlTimer);              // Enable
 }
 
@@ -234,16 +243,20 @@ void loop()
   {
     // Read angle calculation from MPU and calculate the error
     angleR = mpu.getAngleX();
-    error = angleR - setPoint;
+    angleR = (angleR + anglPrev + anglPrev2 + anglPrev3)/4.0;
+    error = angleR - setPoint - moveSetP;
+    if(PIDout > 10 || PIDout < -10) {error += PIDout * 0.015 ;}
 
     // Proporcional
     prop = Kp * error;
 
     // Integral
     inte = inte + ((Ki*(period/1000))/2)*(error + errorPrev);
+    //inte = inte + (Ki * error);
 
     // Derivativo
-    deri = (Kd*(angleR - anglPrev)/period);
+    deri = (Kd*(angleR - anglPrev)/(period));
+    //deri = Kd * (error - errorPrev);
 
     // Salida del PID
     PIDout = prop + inte + deri;
@@ -251,7 +264,7 @@ void loop()
     else if(PIDout > MAX_PID)   {PIDout = MAX_PID;}
     
     // Actualizar la memoria del control
-    anglPrev = angleR; 
+    moveAngleR(); 
     errorPrev = error;
 
     // Dead band where the robot is somewhat balanced (Don't control)
@@ -263,12 +276,18 @@ void loop()
       active = false;
       PIDout = 0;
       inte = 0;
+      moveSetP = 0;
       digitalWrite(EN_M, HIGH);
     }
 
     // TODO: Change PIDout whit WiFI commands for each motor L&R
     PIDoutLeft = -PIDout;
     PIDoutRight = PIDout;
+    if(setPoint > 91) 
+    {
+      if(PIDout < 0)moveSetP += 0.001;
+      if(PIDout > 0)moveSetP -= 0.001;
+    }
     
     // Refactor PIDout value for each motor, take integrer part as pulse period for control
     if(PIDoutLeft > 0)
@@ -291,7 +310,8 @@ void loop()
     }
     else{rightMotorPulseP = 0;}
 
-    //Serial.println(leftMotorPulseP);
+    //Serial.println(millis() - timeAcc);
+    Serial.println(moveSetP);
 
     // Update current execution time
     timeAcc = millis();
@@ -299,9 +319,12 @@ void loop()
   else if(millis() - timeAcc >= period)
   {
     angleR = mpu.getAngleX();
+    angleR = (angleR + anglPrev + anglPrev2 + anglPrev3)/4.0;
+    moveAngleR();
+    //Serial.println(millis() - timeAcc);
 
     // Activate the control loop if Tweepr is up
-    if(!active && angleR > 89 && angleR < 91)
+    if(!active && angleR > 90 && angleR < 92)
     {
       active = true;
       digitalWrite(EN_M, LOW);
@@ -330,6 +353,24 @@ void initPins()
 
   // Disable Stepper Motors while startup (LOW active)
   digitalWrite(EN_M, HIGH);
+}
+
+// Function to initialize MPU6050 sensor
+void mpu6050Init()
+{
+  // Enable Digital Filters
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(0x1A);
+  Wire.write(0x03);     // Write to 0x1A register the value of 003 -> Set Low Filter to ~43Hz
+  Wire.endTransmission();
+}
+
+// Funtion to Move the 4-window filter for the MPU6050 angle reading
+void moveAngleR()
+{
+  anglPrev3 = anglPrev2;
+  anglPrev2 = anglPrev;
+  anglPrev = angleR;
 }
 
 // Split String function into individual values ("" if not found)
