@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweepr Control</title>
+    
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+    
+    <div class="banner">
+        <h1>Tweepr Control Dashboard</h1>
+    </div>
+
+    <div class="card pidGains">
+        <h2>PID gains</h2>
+        <p>
+            Proportional
+            <input type="range" min="0" max="100" value="16" class="slider" id="pRange">
+            <input type="number" name="pVal" id="pVal" min="0" max="100" value="16">
+        </p>
+
+        <p>
+            Integral
+            <input type="range" step="0.25" min="0" max="10" value="4" class="slider" id="iRange">
+            <input type="number" step="0.25" name="iVal" id="iVal" min="0" max="100" value="4.0">
+        </p>
+
+        <p>
+            Derivative
+            <input type="range" min="0" max="100" value="12" class="slider" id="dRange">
+            <input type="number" name="dVal" id="dVal" min="0" max="100" value="12">
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>Movement Control</h2>
+        <div class="moveButts">
+            <table>
+                <tr>
+                  <td></td>
+                  <td>
+                      <a href="/up">
+                          <img class="moveArrow" src="https://cdn-icons-png.flaticon.com/512/64/64491.png" style="transform:rotate(-90deg);">
+                      </a>
+                  </td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td>
+                      <a href="/le">
+                          <img class="moveArrow" src="https://cdn-icons-png.flaticon.com/512/64/64491.png" style="transform:rotate(180deg);">
+                      </a>
+                  </td>
+                  <td></td>
+                  <td>
+                      <a href="/ri">
+                          <img class="moveArrow" src="https://cdn-icons-png.flaticon.com/512/64/64491.png">
+                      </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td>
+                      <a href="/do">
+                        <img class="moveArrow" src="https://cdn-icons-png.flaticon.com/512/64/64491.png" style="transform:rotate(90deg);">
+                      </a>
+                  </td>
+                  <td></td>
+                </tr>
+              </table>
+        </div>
+    </div>
+
+    <a class="activeW" href="/activate">Activate</a>
+
+    <script src="app.js"></script>
+</body>
+</html>

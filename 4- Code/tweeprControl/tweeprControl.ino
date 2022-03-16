@@ -176,7 +176,7 @@ void mpu6050Init()
   // Enable Digital Filters
   Wire.beginTransmission(MPU6050_ADDR);
   Wire.write(0x1A);
-  Wire.write(0x03);     // Write to 0x1A register the value of 003 -> Set Digital low Filter to ~43Hz
+  Wire.write(0x03);     // Write to 0x1A register the value of 003 -> Set Low Filter to ~43Hz
   Wire.endTransmission();
 }
 

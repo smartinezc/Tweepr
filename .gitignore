@@ -1,3 +1,11 @@
 # Folder with useless content
 .Ignore/
 .vscode/
+slprj/
+
+
+# Ignore GCode files, as each printer may vary
+*.gcode
+
+# Ignore Simulink Cache files
+*.slxc
